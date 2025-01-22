@@ -1,32 +1,63 @@
 import express from 'express';
 import {getData, uploadData} from "./firebase.js";
+import {number, z} from 'zod';
 
 const app = new express();
 app.use(express.json());
 
-app.get('/diners',async function(req,res){
-    const data = await getData("diners");
-    console.log(data);
+
+const schema = z.object({
+    Round :  z.number().min(1).max(3),
+    Pool : z.number().min(1).max(10)
 })
 
-app.put('/diners',async function(req,res){
-    const data = await getData("diners");
-    let sum=0,cnt=0,maxi=0;
-    for(let key in data){
-        sum+=data[key];
-        cnt++;
-        if(data[key]>maxi) maxi=data[key];
+app.get('/diners', async function (req,res) {
+    const schemaResult = schema.safeParse(req.body);
+    if (!schemaResult.success) {
+        return res.status(400).json({
+            message: "Invalid Round or Pool number",
+        });
     }
-    const avg=sum/cnt;
-    console.log(avg);
-    const scores={...data};
-    for(let key in scores){
-        if(scores[key]==maxi) scores[key]/=2;
-        scores[key]-=avg;
+    const {Round,Pool} = schemaResult.data;
+    try {
+        const data = await getData("diners", Pool, Round);
+        res.json({
+            message: "Data fetched successfully",
+            data: data,
+        });
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        res.status(500).json({
+            message: "Internal Server Error",
+        });
     }
-    console.log(scores);
-    uploadData(scores,"diners")
 })
+app.put('/diners', async function(req, res) {
+    const schemaResult = schema.safeParse(req.body);
+    if (!schemaResult.success) {
+        return res.status(400).json({
+            message: "Invalid Round or Pool number",
+        });
+    }
+    const {Round,Pool} = schemaResult.data;
+    const data = await getData("diners", Pool, Round);
+    let scoresData=[];
+    let maxi=0,sum=0;
+    for(let i=0;i<data.length;i++){
+        if(data[i]>maxi) maxi=data[i];
+        sum+=data[i];
+    }
+    const avg=sum/data.length;
+    for(let i=0;i<data.length;i++){
+        scoresData[i]=data[i]-avg;
+        if(data[i]==maxi) scoresData[i]-=maxi/2;
+    }
+    await uploadData('diners',Pool,Round,scoresData);
+    res.json({
+        message:"Uploaded successfully"
+    })
+});
+
 
 app.listen(3000,()=>{
     console.log("server is running on port 3000");

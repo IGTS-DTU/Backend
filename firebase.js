@@ -3,7 +3,7 @@ config();
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 import { getAuth } from "firebase/auth";
-import { getFirestore, doc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, collection, getDocs, query, where, getDoc } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -23,23 +23,49 @@ export const database = getDatabase(app);
 
 const fireStoreDB = getFirestore();
 
-const uploadData = async (scores, game) => {
-    const document = doc(fireStoreDB, "Testing", game + "-scores");
-    await setDoc(document, scores); // This stores all key-value pairs at once.
-};
-
-
-const getData = async (game) => {
-    const collectionRef = collection(fireStoreDB, "Testing");
-    const q = query(collectionRef);
-    const querySnapshot = await getDocs(q);
-    const arr = querySnapshot.docs;
-    for(let i=0;i<arr.length;i++){
-        if(arr[i].id==game){
-            return arr[i].data();
+const uploadData = async (game, pool, round, scoreData) => {
+    try {
+        const scoresDocRef = doc(fireStoreDB, 'IGTS', game, "Pool" + pool, 'scores');
+        const scoresDoc = await getDoc(scoresDocRef);
+        if (scoresDoc.exists()) {
+                await setDoc(scoresDocRef, {
+                    ["Round" + round]: scoreData // Create a new array for that round
+                }, { merge: true });
         }
+        console.log(`Data for Round ${round} uploaded successfully!`);
+    } catch (error) {
+        console.error('Error uploading data:', error);
+        throw new Error('Error uploading data');
     }
 };
+
+
+
+const getData = async (game, pool, round) => {
+    try {
+        // Reference to the input document in the specified game and pool
+        const inputDocRef = doc(fireStoreDB, 'IGTS', game, "Pool"+pool, 'input');
+
+        // Fetch the input document
+        const inputDoc = await getDoc(inputDocRef);
+
+        if (inputDoc.exists()) {
+            const inputData = inputDoc.data(); // Get the document data
+
+            // Check if the round exists in the data and return it
+            if (inputData.hasOwnProperty("Round"+round)) {
+                return inputData["Round"+round];
+            } else {
+                throw new Error(`${"Round"+round} not found in input data.`);
+            }
+        } else {
+            throw new Error(`Input document not found in ${game}/${pool}.`);
+        }
+    } catch (error) {
+        console.error('Error fetching data:', error);
+    }
+};
+
 
 export {
     getData,
