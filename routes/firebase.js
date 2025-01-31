@@ -26,18 +26,40 @@ const fireStoreDB = getFirestore();
 const uploadData = async (game, pool, round, scoreData) => {
     try {
         const scoresDocRef = doc(fireStoreDB, 'IGTS', game, "Pool" + pool, 'scores');
+        const finalScoresDocRef = doc(fireStoreDB, 'IGTS', game, "Pool" + pool, 'finalScores');
+
+        // Fetch existing scores document
         const scoresDoc = await getDoc(scoresDocRef);
-        if (scoresDoc.exists()) {
-                await setDoc(scoresDocRef, {
-                    ["Round" + round]: scoreData // Create a new array for that round
-                }, { merge: true });
-        }
+
+        // Upload round data
+        await setDoc(scoresDocRef, {
+            ["Round" + round]: scoreData
+        }, { merge: true });
+
         console.log(`Data for Round ${round} uploaded successfully!`);
+
+        // Fetch existing finalScores document
+        const finalScoresDoc = await getDoc(finalScoresDocRef);
+        let finalScores = Array(scoreData.length).fill(0);
+
+        if (finalScoresDoc.exists()) {
+            finalScores = finalScoresDoc.data().finalScores;
+        }
+
+        // Sum up scores from all rounds
+        for (let i = 0; i < scoreData.length; i++) {
+            finalScores[i] += scoreData[i];
+        }
+
+        // Update finalScores document
+        await setDoc(finalScoresDocRef, { finalScores });
+
     } catch (error) {
         console.error('Error uploading data:', error);
         throw new Error('Error uploading data');
     }
 };
+
 
 
 
@@ -67,7 +89,37 @@ const getData = async (game, pool, round) => {
 };
 
 
+const getFinalData = async (game, pool) => {
+    try {
+        // Reference to the finalscores document inside the specified game and pool
+        const finalScoresDocRef = doc(fireStoreDB, 'IGTS', game, `Pool${pool}`, 'finalScores');
+
+        // Fetch the document
+        const finalScoresDoc = await getDoc(finalScoresDocRef);
+
+        if (!finalScoresDoc.exists()) {
+            throw new Error(`Final scores document not found in ${game}/Pool${pool}.`);
+        }
+
+        return finalScoresDoc.data()["finalScores"]; // Return the data (assumed to contain an array)
+    } catch (error) {
+        console.error('Error fetching final scores:', error);
+        return null; // Return null in case of an error
+    }
+};
+
+const uploadFinalData=async(pool,finalScoresData)=>{
+    try {
+        const finalScoresDocRef = doc(fireStoreDB, 'IGTS', 'FinalScoreBoth', `Pool${pool}`, 'FinalScores');
+        await setDoc(finalScoresDocRef, { finalScores: finalScoresData });
+    } catch (error) {
+        console.error('Error uploading final scores:', error);
+        throw new Error('Error uploading final scores');
+    }
+}
 export {
     getData,
-    uploadData
+    uploadData,
+    getFinalData,
+    uploadFinalData
 };

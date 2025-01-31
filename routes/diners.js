@@ -2,8 +2,8 @@ import express from 'express';
 import {getData, uploadData} from "./firebase.js";
 import {number, z} from 'zod';
 
-const app = new express();
-app.use(express.json());
+const router = express.Router();
+router.use(express.json());
 
 
 const schema = z.object({
@@ -11,7 +11,7 @@ const schema = z.object({
     Pool : z.number().min(1).max(10)
 })
 
-app.get('/diners', async function (req,res) {
+router.get('/', async function (req,res) {
     const schemaResult = schema.safeParse(req.body);
     if (!schemaResult.success) {
         return res.status(400).json({
@@ -32,7 +32,7 @@ app.get('/diners', async function (req,res) {
         });
     }
 })
-app.put('/diners', async function(req, res) {
+router.put('/', async function(req, res) {
     const schemaResult = schema.safeParse(req.body);
     if (!schemaResult.success) {
         return res.status(400).json({
@@ -57,8 +57,4 @@ app.put('/diners', async function(req, res) {
         message:"Uploaded successfully"
     })
 });
-
-
-app.listen(3000,()=>{
-    console.log("server is running on port 3000");
-});
+export default router
